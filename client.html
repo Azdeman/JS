@@ -1,0 +1,30 @@
+<script src="/socket.io/socket.io.js"></script>
+<script>
+	var socket = io(); // подключаем socket io
+	//http://127.0.0.1:3000/?id=test@mail.ru&plathorm=windows&password=test
+	var socket_name = location.search.match(/id=([^&]+)/)[1];
+	var socket_plathorm = location.search.match(/plathorm=([^&]+)/)[1];
+	var socket_password = location.search.match(/password=(.+)/)[1];
+	var user = {
+						'rooms' : socket_name,	
+						'plathorm' : socket_plathorm,
+						'password':	socket_password
+			   }; //передаем rooms = { rooms = email пользователя, plathorm  = платформа (Windows,IOS,Android,Calculator), password = Пароль
+			
+	socket.emit('add_group', user); //добавляем пользователя в группу
+	socket.on('add_sinhronizate_platform',(msg)=>{
+				console.log(msg); // говорим пользователям, что подключился новый пользователь
+	});
+	
+	socket.on('global_info',(data)=>{ // после того как подключились 
+		if(typeof data.data=='boolean'){ // если не верный логин или пароль
+			console.log('Не верный Эмеил или пароль');
+		}else{ //если верный логин и пароль
+			console.log(data); //отдаем данные templates, diaries, notes пользователю который подключился
+		}
+	});
+	
+	
+	
+		
+</script>
