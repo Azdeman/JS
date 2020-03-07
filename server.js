@@ -13,7 +13,6 @@ var connection = mysql.createConnection({
     user     : 'u0942383_plannot',
     password : '0N7j6Y9y',
     database : 'u0942383_plannote',
-    socketPath : '/var/run/mysqld/mysqld.sock',
     port : 80
 });
 
