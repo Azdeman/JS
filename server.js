@@ -9,11 +9,10 @@ app.get('/', (req, res)=>{
 });
 
 var connection = mysql.createConnection({
-    host     : '127.0.0.1',
+    host     : '31.31.198.115',
     user     : 'u0942383_plannot',
     password : '0N7j6Y9y',
     database : 'u0942383_plannote',
-    port : 80
 });
 
 connection.connect();
