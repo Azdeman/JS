@@ -10,9 +10,9 @@ app.get('/', (req, res)=>{
 
 var connection = mysql.createConnection({
     host     : 'localhost',
-    user     : 'root',
-    password : '',
-    database : 'PlanNote'
+    user     : 'u0942383_plannot',
+    password : '0N7j6Y9y',
+    database : 'u0942383_plannote'
 });
 
 connection.connect();
