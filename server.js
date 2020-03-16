@@ -11,12 +11,6 @@ var connection = mysql.createConnection({
     database : 'u0942383_plannote'
 });
 
-// var connection = mysql.createPool({
-//     host     : 'localhost',
-//     user     : 'root',
-//     password : '',
-//     database : 'PlanNote'
-// });
 
 connection.query('SET CHARACTER SET utf8');
 
@@ -118,6 +112,14 @@ const ws = new WebSocket.Server({port:3000});
 								
 							}
 
+			if(status==404){
+				var json_error = {
+								error : 'Ошибка подписи: ключ не существует',
+								status : 404,
+				};
+				socket.send(JSON.stringify(json_error));
+
+			}else{
 					if(json.ACTION == 'GET_CURRENT_WEEK'){
 						
 								if(!users.hasOwnProperty(key_plannote)){ //если группы еще не сущетсвует
@@ -161,6 +163,7 @@ const ws = new WebSocket.Server({port:3000});
 								socket.send(JSON.stringify(OBJ_SEND)); // отправляем информацию в первые подключившемуся
 
 					}else if(json.ACTION == 'SET_NOTE'){ //добавление или изменение
+
 							var now_notes = json.note;
 							let notes  = await INFO_SELECT('notes','id','WHERE `id_keygen` = "'+id_keygen+'"');
 							var obj__ = {
@@ -190,7 +193,7 @@ const ws = new WebSocket.Server({port:3000});
 						var obj__ = {
 
 																"ACTION" : 'UPDATE_TEMPLATE' ,
-																"note" : now_templates ,
+																"template" : now_templates ,
 														};		
 											if(templates!=false){
 												var info_update = await INFO_UPDATE('templates','`text` ="'+now_templates+'",`updates` =NOW()','WHERE `id_keygen` = "'+id_keygen+'"');
@@ -269,7 +272,7 @@ const ws = new WebSocket.Server({port:3000});
 
 					}
 
-
+			}
 				});
 
 socket.on('close', function () {
