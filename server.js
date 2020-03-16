@@ -3,19 +3,20 @@ var http = require('http').createServer(app);
 var mysql = require('mysql');
 var WebSocket = require('ws');
 
-// var connection = mysql.createConnection({
-//     host     : '31.31.198.115',
-//     user     : 'u0942383_plannot',
-//     password : '0N7j6Y9y',
-//     database : 'u0942383_plannote'
-// });
 
-var connection = mysql.createPool({
-    host     : 'localhost',
-    user     : 'root',
-    password : '',
-    database : 'PlanNote'
+var connection = mysql.createConnection({
+    host     : '31.31.198.115',
+    user     : 'u0942383_plannot',
+    password : '0N7j6Y9y',
+    database : 'u0942383_plannote'
 });
+
+// var connection = mysql.createPool({
+//     host     : 'localhost',
+//     user     : 'root',
+//     password : '',
+//     database : 'PlanNote'
+// });
 
 connection.query('SET CHARACTER SET utf8');
 
@@ -65,9 +66,10 @@ function SendInfo(OBJ_SEND, ROOM, BROADCAST = false, socket){
 }
 
 async function INFO_SELECT(table_name, get_colum, where){
-	let sql_  = "SELECT `"+get_colum+"` FROM `"+table_name+"` "+where+"";
+	let sql_  = "SELECT "+get_colum+" FROM `"+table_name+"` "+where+"";
 		return new Promise((resolve,reject)=>{
 			connection.query(sql_,(err,result)=>{
+				
 				var json_result_select = JSON.parse(JSON.stringify(result));
 						resolve(json_result_select);
 								
@@ -105,10 +107,15 @@ const ws = new WebSocket.Server({port:3000});
 		socket.on('message', async (message)=>{
 					var json 		 = JSON.parse(message),
 						key_plannote = json.KEY,
-						id_keygen 	 = await INFO_SELECT('keygen','id','WHERE `key_` = "'+key_plannote+'"');
-
+						id_keygen 	 = await INFO_SELECT('keygen','id','WHERE `key_` = "'+key_plannote+'"'),
+						status;
+						
 							if(id_keygen!=false){
 								id_keygen = id_keygen[0]['id'];
+								status = 200;
+							}else{
+								status = 404;
+								
 							}
 
 					if(json.ACTION == 'GET_CURRENT_WEEK'){
@@ -122,56 +129,72 @@ const ws = new WebSocket.Server({port:3000});
 								
 								//запросы
 
+								let notes__  	 = await INFO_SELECT('notes','note','WHERE `id_keygen` = "'+id_keygen+'"');
+								let templates__  = await INFO_SELECT('templates','text','WHERE `id_keygen` = "'+id_keygen+'"');
+								let diaries__    = await INFO_SELECT('diaries','text, date', 'WHERE YEAR(`date`) = YEAR(NOW()) AND WEEK(`date`, 1) = WEEK(NOW(), 1) AND `id_keygen` = "'+id_keygen+'" ');
+								var send_diaries = {};
+								if(diaries__!=false){
+
+									for(var i =0;i<diaries__.length;i++){
+											var dd = new Date(diaries__[i].date).getDate();
+											var mm = diaries__[i].date.match(/\d{4}\-(\d+)\-/)[1];
+											var yy = new Date(diaries__[i].date).getFullYear();
+											send_diaries[dd+'.'+mm+'.'+yy] = diaries__[i].text;
+									}
+								}
+
+								
+
 
 								var OBJ_SEND  = {};
-									OBJ_SEND["ACTION"]  = "UPDATE_CURRENT_WEEK";
-									OBJ_SEND["ITEM"] 	=  {};
-									OBJ_SEND["ITEM"].note = 1;
-									OBJ_SEND["ITEM"].template = 2;
-									OBJ_SEND["ITEM"].days = {"09.02.2000":'Текст'};
-									OBJ_SEND["STATUS"] = 200;
+
+									OBJ_SEND["ACTION"]        = 	"UPDATE_CURRENT_WEEK";
+									OBJ_SEND["ITEM"] 	      =  	{};
+									OBJ_SEND["ITEM"].note 	  = 	(notes__!=false) ? notes__[0]['note'] : null;
+									OBJ_SEND["ITEM"].template = 	(templates__!=false) ? templates__[0]['text'] : null;
+									OBJ_SEND["ITEM"].days     = 	send_diaries;
+									OBJ_SEND["SOCKET_KEY"]    = 	send_key;
+									OBJ_SEND["STATUS"]        =		status;
 
 
-								socket.send(JSON.stringify(obj__)); // отправляем информацию в первые подключившемуся
+
+								socket.send(JSON.stringify(OBJ_SEND)); // отправляем информацию в первые подключившемуся
 
 					}else if(json.ACTION == 'SET_NOTE'){ //добавление или изменение
-							// var now_notes = json.note;
-
-							var now_notes = 'Новая заметка!';
+							var now_notes = json.note;
 							let notes  = await INFO_SELECT('notes','id','WHERE `id_keygen` = "'+id_keygen+'"');
-								
-											if(notes!=false){
-												var info_update = await INFO_UPDATE('notes','`note` ="'+now_notes+'"','WHERE `id_keygen` = "'+id_keygen+'"');
-													if(info_update){
-														var obj__ = {
+							var obj__ = {
 
 																"ACTION" : 'UPDATE_NOTE' ,
 																"note" : now_notes ,
-														};
+														};	
+											if(notes != false){
+												var info_update = await INFO_UPDATE('notes','`note` ="'+now_notes+'"','WHERE `id_keygen` = "'+id_keygen+'"');
+													if(info_update){
+														
 														SendInfo(obj__, key_plannote, true, socket);
 													}
 											}else{
+												
 												var insert_notes = await INFO_INSERT('notes',"'','"+id_keygen+"','"+now_notes+"',NOW()");
 													if(insert_notes){
-														SendInfo(obj__, key_plannote, true, socket);
+														SendInfo(obj__, key_plannote, true, socket);		
 													}
-											}
+											
+													}
 							
 
 					}else if(json.ACTION == 'SET_TEMPLATE'){
-						// var now_templates = json.template;
-
-						var now_templates = 'Новый шаблон';
+						var now_templates = json.template;
 						let templates  = await INFO_SELECT('templates','id','WHERE `id_keygen` = "'+id_keygen+'"');
-								
-											if(templates!=false){
-												var info_update = await INFO_UPDATE('templates','`text` ="'+now_templates+'"','WHERE `id_keygen` = "'+id_keygen+'"');
-													if(info_update){
-														var obj__ = {
+						var obj__ = {
 
 																"ACTION" : 'UPDATE_TEMPLATE' ,
 																"note" : now_templates ,
-														};
+														};		
+											if(templates!=false){
+												var info_update = await INFO_UPDATE('templates','`text` ="'+now_templates+'",`updates` =NOW()','WHERE `id_keygen` = "'+id_keygen+'"');
+													if(info_update){
 														SendInfo(obj__, key_plannote, true, socket);
 													}
 											}else{
@@ -182,25 +205,24 @@ const ws = new WebSocket.Server({port:3000});
 											}
 
 					}else if(json.ACTION == 'SET_DAY'){
-						// var date = Object.keys(json)[2];
-						// var now_diaries = Object.values(json)[2]
-							var date = '16.03.2020'; //время от пользователя
-							var now_diaries = 'Новая diaries'; //заметка от пользователя
+						var date = Object.keys(json)[2];
+						var now_diaries = Object.values(json)[2]
 							var date_form  = DateFormat(date,'user'); //преобразовываем дату как в бд
+							var obj__ = {
+
+																"ACTION" : 'UPDATE_DAY' ,
+														};
+														obj__[date] = now_diaries;
 
 								let diaries  = await INFO_SELECT('diaries','id','WHERE `id_keygen` = "'+id_keygen+'" AND `date` = "'+date_form+'"');
 									if(diaries!=false){
 												var info_update = await INFO_UPDATE('diaries','`text` ="'+now_diaries+'",`updates` = NOW()','WHERE `id_keygen` = "'+id_keygen+'" AND `date` = "'+date_form+'"');
 													if(info_update){
-														var obj__ = {
-
-																"ACTION" : 'UPDATE_DAY' ,
-														};
-														obj__[date] = now_diaries;
+														
 														SendInfo(obj__, key_plannote, true, socket);
 													}
 									}else{
-										var insert_diaries = await INFO_INSERT('diaries',"'','"+id_keygen+"','"+now_diaries+"',CURDATE(), NOW()");
+										var insert_diaries = await INFO_INSERT('diaries',"'','"+id_keygen+"','"+now_diaries+"','"+date_form+"', NOW()");
 													if(insert_diaries){
 														SendInfo(obj__, key_plannote, true, socket);
 													}
@@ -210,7 +232,7 @@ const ws = new WebSocket.Server({port:3000});
 					}else if(json.ACTION == 'GET_NOTE'){
 
 						var get_note  = await INFO_SELECT('notes','note','WHERE `id_keygen` = "'+id_keygen+'"');
-									console.log(get_note);
+									
 								var obj__ = {
 
 												"ACTION" : 'RES_GET_NOTE',
@@ -233,8 +255,7 @@ const ws = new WebSocket.Server({port:3000});
 									socket.send(JSON.stringify(obj__));
 
 					}else if(json.ACTION == 'GET_DAY'){
-						// var date = Object.keys(json)[1];
-							var date = '16.03.2020'; //время от пользователя
+							var date = Object.values(json)[2];
 							var date_form  = DateFormat(date,'user'); //преобразовываем дату как в бд
 							var get_diaries  = await INFO_SELECT('diaries','text','WHERE `id_keygen` = "'+id_keygen+'" AND `date` = "'+date_form+'"');
 
@@ -247,6 +268,7 @@ const ws = new WebSocket.Server({port:3000});
 									socket.send(JSON.stringify(obj__));
 
 					}
+
 
 				});
 
