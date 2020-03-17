@@ -12,6 +12,7 @@ var connection = mysql.createConnection({
 });
 
 
+
 connection.query('SET CHARACTER SET utf8');
 
 connection.query('SELECT 1+1',(err,rows)=>{});
@@ -20,6 +21,56 @@ connection.query('SELECT 1+1',(err,rows)=>{});
 app.get('/', (req, res)=>{
 	res.sendFile(__dirname + '/client.html');
 });
+
+
+function getMont(mth){
+    var month = {
+                0:'01',
+                1:'02',
+                2:'03',
+                3:'04',
+                4:'05',
+                5:'06',
+                6:'07',
+                7:'08',
+                8:'09',
+                9:'10',
+                10:'11',
+                11: '12'
+            };
+    return month[mth];
+}
+function getMonday(d) {
+  d = new Date(d);
+  var day = d.getDay(),
+      diff = d.getDate() - (new Date().getDay())+1; 
+  return new Date(d.setDate(diff));
+}
+
+function getWeek(OneDay,day_i) {
+  var d = new Date(OneDay);
+  var day = d.getDay();
+      var diff = d.getDate() + day_i; 
+      var result = new Date(d.setDate(diff));
+        return result.getDate()+'.'+getMont(result.getMonth())+'.'+result.getFullYear();
+}
+
+var week_date = [];
+for(var i = 0;i<7;i++){
+    week_date.push(getWeek(getMonday(new Date()),i));
+}
+
+function rangeDays(start,stop){
+var date1 = new Date(start);
+var date2 = new Date(stop);
+var daysLag = Math.ceil(Math.abs(date2.getTime() - date1.getTime()) / (1000 * 3600 * 24));
+var date__ = [];
+    for(var i=0;i<=daysLag;i++){
+        date__.push(getWeek(new Date(start),i));
+    }
+    return date__;
+}
+
 
 function DeleteUsers(socketID){
 var delete_id = socketID;
@@ -130,23 +181,38 @@ const ws = new WebSocket.Server({port:3000});
 								}
 								
 								//запросы
+								var start_date__sql  = DateFormat(week_date[0],'user');
+								var end_date__sql 	 = DateFormat(week_date[week_date.length-1],'user');
+
+								var send_diaries = {};
 
 								let notes__  	 = await INFO_SELECT('notes','note','WHERE `id_keygen` = "'+id_keygen+'"');
 								let templates__  = await INFO_SELECT('templates','text','WHERE `id_keygen` = "'+id_keygen+'"');
-								let diaries__    = await INFO_SELECT('diaries','text, date', 'WHERE YEAR(`date`) = YEAR(NOW()) AND WEEK(`date`, 1) = WEEK(NOW(), 1) AND `id_keygen` = "'+id_keygen+'" ');
-								var send_diaries = {};
+								let diaries__    = await INFO_SELECT('diaries','text, date', 'WHERE `date` BETWEEN "'+start_date__sql+'" AND "'+end_date__sql+'" AND `id_keygen` = "'+id_keygen+'"')
+									
 								if(diaries__!=false){
 
+								week_date.forEach(el=>{
 									for(var i =0;i<diaries__.length;i++){
 											var dd = new Date(diaries__[i].date).getDate();
 											var mm = diaries__[i].date.match(/\d{4}\-(\d+)\-/)[1];
 											var yy = new Date(diaries__[i].date).getFullYear();
-											send_diaries[dd+'.'+mm+'.'+yy] = diaries__[i].text;
+										if(el == dd+'.'+mm+'.'+yy){
+												send_diaries[dd+'.'+mm+'.'+yy] = diaries__[i].text;
+													break;
+										}else{
+												send_diaries[el] = '';
+										}
 									}
+
+								});
+
+
+								}else{
+									week_date.forEach(el=>{
+											send_diaries[el] = '';
+									});
 								}
-
-								
-
 
 								var OBJ_SEND  = {};
 
@@ -239,7 +305,7 @@ const ws = new WebSocket.Server({port:3000});
 								var obj__ = {
 
 												"ACTION" : 'RES_GET_NOTE',
-												"note"   : (get_note!=false) ? get_note[0]['note'] : 'No Note'
+												"note"   : (get_note!=false) ? get_note[0]['note'] : ''
 											};
 										
 									socket.send(JSON.stringify(obj__));
@@ -252,7 +318,7 @@ const ws = new WebSocket.Server({port:3000});
 								var obj__ = {
 
 												"ACTION" : 'RES_GET_TEMPLATE',
-												"template"   : (get_template!=false) ? get_template[0]['text'] : 'No Template'
+												"template"   : (get_template!=false) ? get_template[0]['text'] : ''
 											};
 										
 									socket.send(JSON.stringify(obj__));
@@ -266,10 +332,55 @@ const ws = new WebSocket.Server({port:3000});
 
 																"ACTION" : 'RES_GET_DAY' ,
 														};
-											obj__[date] = (get_diaries!=false) ? get_diaries[0]['text'] : 'No Diaries';
+											obj__[date] = (get_diaries!=false) ? get_diaries[0]['text'] : '';
 										
 									socket.send(JSON.stringify(obj__));
 
+					}else if(json.ACTION == 'GET_DAYS_RANGE'){
+						var date_start = json.Start || null;
+						var date_end   = json.End || null;
+						if(date_start!=null && date_end !=null){
+
+							date_start = DateFormat(date_start,'user');
+							date_end   = DateFormat(date_end,'user');
+
+							var get_range_date = rangeDays(date_start, date_end);
+								
+							var get_diaries  = await INFO_SELECT('diaries','text, date','WHERE `date` BETWEEN "'+date_start+'" AND "'+date_end+'" AND `id_keygen` = "'+id_keygen+'"');
+
+							var send_diaries__ = {};
+								if(get_diaries!=false){
+
+							get_range_date.forEach(el=>{
+									for(var i =0;i<get_diaries.length;i++){
+											var dd = new Date(get_diaries[i].date).getDate();
+											var mm = get_diaries[i].date.match(/\d{4}\-(\d+)\-/)[1];
+											var yy = new Date(get_diaries[i].date).getFullYear();
+											if(el == dd+'.'+mm+'.'+yy){
+												send_diaries__[dd+'.'+mm+'.'+yy] = get_diaries[i].text;
+													break;
+											}else{
+												send_diaries__[el] = '';
+											}
+										}
+								
+								});
+
+
+							}else{
+									get_range_date.forEach(el=>{
+										send_diaries__[el] = '';
+									});
+							}
+
+								var OBJ_SEND  = {};
+
+									OBJ_SEND["ACTION"]  = 	"RES_GET_DAYS_RANGE";
+									OBJ_SEND["days"]    = 	send_diaries__;
+
+								socket.send(JSON.stringify(OBJ_SEND));
+
+						}
 					}
 
 			}
