@@ -4,23 +4,25 @@ var mysql = require('mysql');
 var WebSocket = require('ws');
 
 
-var connection = mysql.createConnection({
+var connection = mysql.createPool({
     host     : '31.31.198.115',
     user     : 'u0942383_plannot',
     password : '0N7j6Y9y',
     database : 'u0942383_plannote'
 });
 
-
-
 connection.query('SET CHARACTER SET utf8');
 
 connection.query('SELECT 1+1',(err,rows)=>{});
 
 
-app.get('/', (req, res)=>{
-	res.sendFile(__dirname + '/client.html');
-});
+function GET_ERROR(mess,status){
+let error = {
+				error : mess,
+				status : status,
+				};
+    return error;
+}
 
 
 function getMont(mth){
@@ -164,15 +166,12 @@ const ws = new WebSocket.Server({port:3000});
 							}
 
 			if(status==404){
-				var json_error = {
-								error : 'Ошибка подписи: ключ не существует',
-								status : 404,
-				};
-				socket.send(JSON.stringify(json_error));
-
+					socket.send(JSON.stringify(GET_ERROR('Ошибка подписи: ключ не существует',404)));
 			}else{
 					if(json.ACTION == 'GET_CURRENT_WEEK'){
 						
+
+
 								if(!users.hasOwnProperty(key_plannote)){ //если группы еще не сущетсвует
 										users[key_plannote] = [];
 										users[key_plannote].push({'socket_key' : send_key, 'connect' : socket });
@@ -216,7 +215,7 @@ const ws = new WebSocket.Server({port:3000});
 
 								var OBJ_SEND  = {};
 
-									OBJ_SEND["ACTION"]        = 	"UPDATE_CURRENT_WEEK";
+									OBJ_SEND["ACTION"]        = 	"RES_GET_CURRENT_WEEK";
 									OBJ_SEND["ITEM"] 	      =  	{};
 									OBJ_SEND["ITEM"].note 	  = 	(notes__!=false) ? notes__[0]['note'] : null;
 									OBJ_SEND["ITEM"].template = 	(templates__!=false) ? templates__[0]['text'] : null;
@@ -229,6 +228,7 @@ const ws = new WebSocket.Server({port:3000});
 								socket.send(JSON.stringify(OBJ_SEND)); // отправляем информацию в первые подключившемуся
 
 					}else if(json.ACTION == 'SET_NOTE'){ //добавление или изменение
+							if(json.hasOwnProperty('note')){
 
 							var now_notes = json.note;
 							let notes  = await INFO_SELECT('notes','id','WHERE `id_keygen` = "'+id_keygen+'"');
@@ -251,9 +251,13 @@ const ws = new WebSocket.Server({port:3000});
 													}
 											
 													}
-							
+							}else{
+								socket.send(JSON.stringify(GET_ERROR('Bad Request',400)));
+							}
 
 					}else if(json.ACTION == 'SET_TEMPLATE'){
+						if(json.hasOwnProperty('template')){
+
 						var now_templates = json.template;
 						let templates  = await INFO_SELECT('templates','id','WHERE `id_keygen` = "'+id_keygen+'"');
 						var obj__ = {
@@ -272,10 +276,16 @@ const ws = new WebSocket.Server({port:3000});
 														SendInfo(obj__, key_plannote, true, socket);
 													}
 											}
+						}else{
+							socket.send(JSON.stringify(GET_ERROR('Bad Request',400)));
+						}
 
 					}else if(json.ACTION == 'SET_DAY'){
-						var date = Object.keys(json)[2];
-						var now_diaries = Object.values(json)[2]
+						var date = Object.keys(json)[2] || null;
+						var now_diaries = Object.values(json)[2] || null;
+
+						if(date!=null && date !=null){
+
 							var date_form  = DateFormat(date,'user'); //преобразовываем дату как в бд
 							var obj__ = {
 
@@ -296,7 +306,9 @@ const ws = new WebSocket.Server({port:3000});
 														SendInfo(obj__, key_plannote, true, socket);
 													}
 									}
-
+						}else{
+								socket.send(JSON.stringify(GET_ERROR('Bad Request',400)));
+						}
 
 					}else if(json.ACTION == 'GET_NOTE'){
 
@@ -324,7 +336,8 @@ const ws = new WebSocket.Server({port:3000});
 									socket.send(JSON.stringify(obj__));
 
 					}else if(json.ACTION == 'GET_DAY'){
-							var date = Object.values(json)[2];
+							var date = Object.values(json)[2] || null;
+						if(date!=null){
 							var date_form  = DateFormat(date,'user'); //преобразовываем дату как в бд
 							var get_diaries  = await INFO_SELECT('diaries','text','WHERE `id_keygen` = "'+id_keygen+'" AND `date` = "'+date_form+'"');
 
@@ -335,6 +348,9 @@ const ws = new WebSocket.Server({port:3000});
 											obj__[date] = (get_diaries!=false) ? get_diaries[0]['text'] : '';
 										
 									socket.send(JSON.stringify(obj__));
+						}else{
+							socket.send(JSON.stringify(GET_ERROR('Bad Request',400)));
+						}
 
 					}else if(json.ACTION == 'GET_DAYS_RANGE'){
 						var date_start = json.Start || null;
@@ -375,19 +391,28 @@ const ws = new WebSocket.Server({port:3000});
 
 								var OBJ_SEND  = {};
 
-									OBJ_SEND["ACTION"]  = 	"RES_GET_DAYS_RANGE";
-									OBJ_SEND["days"]    = 	send_diaries__;
+									OBJ_SEND["ACTION"]    = 	"RES_GET_DAYS_RANGE";
+									OBJ_SEND["days"]      = 	send_diaries__;
+									OBJ_SEND["STATUS"]    = 	200;
 
 								socket.send(JSON.stringify(OBJ_SEND));
 
+						}else{
+							socket.send(JSON.stringify(GET_ERROR('Bad Request',400)));
 						}
+					}else if(json.ACTION=='STOP_CONNECT'){
+							let socket_key__ = json.SOCKET_KEY;
+								DeleteUsers(socket_key__);
+					}
+					else{
+						socket.send(JSON.stringify(GET_ERROR('Bad Request',400)));
 					}
 
 			}
 				});
 
 socket.on('close', function () {
-     console.log('close and deleted: '+ send_key );
+     console.log('Close User: '+ send_key );
      		DeleteUsers(send_key);
   });
 
