@@ -24,42 +24,46 @@ let error = {
     return error;
 }
 
+var getMont = ((mth)=>{
+	    var month = {
+	                0:'01',
+	                1:'02',
+	                2:'03',
+	                3:'04',
+	                4:'05',
+	                5:'06',
+	                6:'07',
+	                7:'08',
+	                8:'09',
+	                9:'10',
+	                10:'11',
+	                11: '12'
+	            };
+	    return month[mth];
+	});
 
-function getMont(mth){
-    var month = {
-                0:'01',
-                1:'02',
-                2:'03',
-                3:'04',
-                4:'05',
-                5:'06',
-                6:'07',
-                7:'08',
-                8:'09',
-                9:'10',
-                10:'11',
-                11: '12'
-            };
-    return month[mth];
-}
-function getMonday(d) {
-  d = new Date(d);
-  var day = d.getDay(),
-      diff = d.getDate() - (new Date().getDay())+1; 
-  return new Date(d.setDate(diff));
-}
+var getWeek = ((OneDay,day_i) => {
+	  var d = new Date(OneDay);
+	  var day = d.getDay();
+	      var diff = d.getDate() + day_i; 
+	      var result = new Date(d.setDate(diff));
+	        return result.getDate()+'.'+getMont(result.getMonth())+'.'+result.getFullYear();
+	});
 
-function getWeek(OneDay,day_i) {
-  var d = new Date(OneDay);
-  var day = d.getDay();
-      var diff = d.getDate() + day_i; 
-      var result = new Date(d.setDate(diff));
-        return result.getDate()+'.'+getMont(result.getMonth())+'.'+result.getFullYear();
-}
 
-var week_date = [];
-for(var i = 0;i<7;i++){
-    week_date.push(getWeek(getMonday(new Date()),i));
+var getMonday = ((d) => {
+	  d = new Date(d);
+	  var day = d.getDay(),
+	      diff = d.getDate() - (new Date().getDay())+1; 
+	  return new Date(d.setDate(diff));
+	});
+
+function GET_DATE__(){
+	var week_date = [];
+	for(var i = 0;i<7;i++){
+	    week_date.push(getWeek(getMonday(new Date()),i));
+	}
+	return week_date;
 }
 
 function rangeDays(start,stop){
@@ -169,7 +173,8 @@ const ws = new WebSocket.Server({port:3000});
 					socket.send(JSON.stringify(GET_ERROR('Ошибка подписи: ключ не существует',404)));
 			}else{
 					if(json.ACTION == 'GET_CURRENT_WEEK'){
-						
+								
+								week_date = GET_DATE__();
 
 
 								if(!users.hasOwnProperty(key_plannote)){ //если группы еще не сущетсвует
