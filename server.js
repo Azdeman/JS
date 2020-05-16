@@ -51,17 +51,21 @@ var getWeek = ((OneDay,day_i) => {
 	});
 
 
-var getMonday = ((d) => {
-	  d = new Date(d);
-	  var day = d.getDay(),
-	      diff = d.getDate() - (new Date().getDay())+1; 
-	  return new Date(d.setDate(diff));
+var getMonday = (() => {
+	  d = new Date();
+	  var day = d.getDay();
+        if(day==0){
+            diff = d.getDate() - 6;
+        }else{
+            diff = d.getDate() - (new Date().getDay()) + 1; 
+        }
+        return new Date(d.setDate(diff));
 	});
 
 function GET_DATE__(){
 	var week_date = [];
 	for(var i = 0;i<7;i++){
-	    week_date.push(getWeek(getMonday(new Date()),i));
+	    week_date.push(getWeek(getMonday(),i));
 	}
 	return week_date;
 }
