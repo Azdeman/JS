@@ -11,6 +11,7 @@ var connection = mysql.createPool({
     database : 'u0942383_plannote'
 });
 
+
 connection.query('SET CHARACTER SET utf8');
 
 connection.query('SELECT 1+1',(err,rows)=>{});
@@ -292,8 +293,8 @@ const ws = new WebSocket.Server({port:3000});
 					}else if(json.ACTION == 'SET_DAY'){
 						var date = Object.keys(json)[2] || null;
 						var now_diaries = Object.values(json)[2] || null;
-
-						if(date!=null && date !=null){
+						var timestamp = Object.values(json)[3] || null;
+						if(date!=null && date !=null && timestamp !=null){
 
 							var date_form  = DateFormat(date,'user'); //преобразовываем дату как в бд
 							var obj__ = {
@@ -304,11 +305,18 @@ const ws = new WebSocket.Server({port:3000});
 
 								let diaries  = await INFO_SELECT('diaries','id','WHERE `id_keygen` = "'+id_keygen+'" AND `date` = "'+date_form+'"');
 									if(diaries!=false){
+
+									let timestamp__  = await INFO_SELECT('diaries','id','WHERE `id_keygen` = "'+id_keygen+'" AND `date` = "'+date_form+'" AND UNIX_TIMESTAMP(`updates`) > "'+timestamp+'"');	
+
+									if(timestamp__ == false){
 												var info_update = await INFO_UPDATE('diaries','`text` ="'+now_diaries+'",`updates` = NOW()','WHERE `id_keygen` = "'+id_keygen+'" AND `date` = "'+date_form+'"');
 													if(info_update){
 														
 														SendInfo(obj__, key_plannote, true, socket);
 													}
+										}else{
+											socket.send(JSON.stringify(GET_ERROR('Bad Request',400)));
+										}
 									}else{
 										var insert_diaries = await INFO_INSERT('diaries',"'','"+id_keygen+"','"+now_diaries+"','"+date_form+"', NOW()");
 													if(insert_diaries){
@@ -412,6 +420,26 @@ const ws = new WebSocket.Server({port:3000});
 					}else if(json.ACTION=='STOP_CONNECT'){
 							let socket_key__ = json.SOCKET_KEY;
 								DeleteUsers(socket_key__);
+					}else if(json.ACTION=="GET_SEARCH"){
+						if(json.hasOwnProperty('search')){
+							let search_str = json.search;
+
+								if(search_str.match(/^\S+/)){
+
+									var get_diaries  = await INFO_SELECT('diaries','text, DATE_FORMAT(date, "%d.%m.%y") as date','WHERE `text` LIKE "%'+search_str+'%"  AND `id_keygen` = "'+id_keygen+'"');
+
+									
+
+									var OBJ_SEND  = {};
+
+									OBJ_SEND["ACTION"]    = 	"RES_GET_SEARCH";
+									OBJ_SEND["search"]    = 	get_diaries;
+									OBJ_SEND["STATUS"]    = 	200;
+
+									socket.send(JSON.stringify(OBJ_SEND));
+
+								}
+						}
 					}
 					else{
 						socket.send(JSON.stringify(GET_ERROR('Bad Request',400)));
