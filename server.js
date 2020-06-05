@@ -197,7 +197,7 @@ const ws = new WebSocket.Server({port:3000});
 
 								let notes__  	 = await INFO_SELECT('notes','note','WHERE `id_keygen` = "'+id_keygen+'"');
 								let templates__  = await INFO_SELECT('templates','text','WHERE `id_keygen` = "'+id_keygen+'"');
-								let diaries__    = await INFO_SELECT('diaries','text, date', 'WHERE `date` BETWEEN "'+start_date__sql+'" AND "'+end_date__sql+'" AND `id_keygen` = "'+id_keygen+'"')
+								let diaries__    = await INFO_SELECT('diaries','text, DATE_FORMAT(date, "%Y-%m-%d") as date', 'WHERE `date` BETWEEN "'+start_date__sql+'" AND "'+end_date__sql+'" AND `id_keygen` = "'+id_keygen+'"')
 									
 								if(diaries__!=false){
 
